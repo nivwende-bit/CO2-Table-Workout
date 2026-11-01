@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CO2 Table Timer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#04101c">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@400;600&display=swap">
 <style>
 :root{--bg:#04101c;--fg:#ffffff;--dim:#9fb4c8;--line:#1d3347;--rest:#59f0d2;--hold:#ff6a45;--final:#ffd84a;--panel:#0a1b2b;
@@ -189,5 +194,6 @@ $('pause').addEventListener('click',function(){
 document.addEventListener('visibilitychange',function(){ if(!document.hidden&&timer&&!wake&&$('run').classList.contains('on'))getWake(); });
 })();
 </script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}</script>
 </body>
 </html>
