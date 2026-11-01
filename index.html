@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CO2 Table Timer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Barlow:wght@400;600&display=swap">
+<style>
+:root{--bg:#04101c;--fg:#ffffff;--dim:#9fb4c8;--line:#1d3347;--rest:#59f0d2;--hold:#ff6a45;--final:#ffd84a;--panel:#0a1b2b;
+ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme: light){:root:not([data-theme="light"]){--bg:#04101c}}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:'Barlow',system-ui,sans-serif;font-size:18px}
+.num{font-family:'Barlow Condensed','Arial Narrow',Impact,sans-serif;font-variant-numeric:tabular-nums}
+button,select{font:inherit}
+:focus-visible{outline:3px solid var(--final);outline-offset:3px}
+.screen{min-height:100%;display:none;flex-direction:column;padding:20px;max-width:760px;margin:0 auto}
+.screen.on{display:flex}
+
+/* setup */
+h1{font-family:'Barlow Condensed',Impact,sans-serif;font-weight:800;font-size:clamp(40px,9vw,64px);margin:8px 0 4px;line-height:1}
+.sub{color:var(--dim);margin:0 0 24px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.field label{font-weight:600;color:var(--dim)}
+select{background:var(--panel);color:var(--fg);border:2px solid var(--line);border-radius:10px;padding:14px;font-size:22px;font-weight:600}
+table{width:100%;border-collapse:collapse;margin:8px 0 20px;font-size:17px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-weight:600}
+td.c{color:var(--final)}
+.note{color:var(--final);font-size:15px;margin:-10px 0 18px;min-height:1em}
+.go{background:var(--rest);color:#02130f;border:0;border-radius:14px;padding:20px;font-size:28px;font-weight:700;cursor:pointer;margin-top:auto}
+
+/* session */
+#run{align-items:center;text-align:center;justify-content:space-between;max-width:none}
+#run[data-p="rest"]{--c:var(--rest)} #run[data-p="hold"]{--c:var(--hold)} #run[data-p="final"]{--c:var(--final)} #run[data-p="done"]{--c:var(--fg)}
+.top{width:100%;display:flex;justify-content:space-between;font-size:clamp(20px,4.5vw,30px);font-weight:600;color:var(--dim)}
+.mid{display:flex;flex-direction:column;align-items:center;gap:2vh;width:100%}
+#phase{font-family:'Barlow Condensed',Impact,sans-serif;font-weight:800;font-size:clamp(64px,17vw,170px);line-height:.95;color:var(--c);letter-spacing:.02em}
+#time{font-family:'Barlow Condensed',Impact,sans-serif;font-weight:700;font-size:clamp(120px,36vw,380px);line-height:.9;font-variant-numeric:tabular-nums}
+.orb{width:clamp(90px,24vmin,220px);height:clamp(90px,24vmin,220px);border-radius:50%;border:6px solid var(--c);background:color-mix(in srgb,var(--c) 22%,transparent);transform:scale(.45);transition:transform 5.5s linear}
+#run[data-p="hold"] .orb,#run[data-p="done"] .orb{visibility:hidden}
+#next{font-size:clamp(20px,4.5vw,32px);color:var(--dim);min-height:1.3em}
+.ctl{display:flex;gap:14px;width:100%;max-width:560px}
+.ctl button{flex:1;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--fg);padding:16px;font-size:22px;font-weight:600;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.orb{transition-duration:.01s!important}}
+</style>
+</head>
+<body>
+
+<main class="screen on" id="setup">
+  <h1>CO2 table</h1>
+  <p class="sub">Constant hold, shrinking rest. Starts with the rest phase so you can settle first.</p>
+  <div class="field"><label for="hold">Breath-hold duration</label>
+    <select id="hold"><option value="60">1:00</option><option value="75">1:15</option><option value="90" selected>1:30</option><option value="105">1:45</option><option value="120">2:00</option></select></div>
+  <div class="field"><label for="rest">Initial rest duration</label>
+    <select id="rest"><option value="60">1:00</option><option value="120">2:00</option><option value="150">2:30</option><option value="180" selected>3:00</option></select></div>
+  <div class="field"><label for="rounds">Total rounds</label>
+    <select id="rounds"><option value="4">4</option><option value="6" selected>6</option><option value="8">8</option></select></div>
+  <table aria-label="Session schedule"><thead><tr><th>Round</th><th>Rest</th><th>Hold</th></tr></thead><tbody id="sched"></tbody></table>
+  <div class="note" id="note"></div>
+  <button class="go" id="start">Start session</button>
+</main>
+
+<main class="screen" id="run" data-p="rest">
+  <div class="top"><span id="rnd">Round 1 / 6</span><span id="tot"></span></div>
+  <div class="mid">
+    <div id="phase">INHALE</div>
+    <div class="orb" id="orb"></div>
+    <div id="time">0:00</div>
+  </div>
+  <div style="width:100%;display:flex;flex-direction:column;align-items:center;gap:18px">
+    <div id="next"></div>
+    <div class="ctl"><button id="pause">Pause</button><button id="stop">End</button></div>
+  </div>
+</main>
+
+<script>
+(function(){
+var MIN_REST=15, STEP=15, PACE=5500;
+var $=function(id){return document.getElementById(id)};
+var fmt=function(s){s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+
+function plan(){
+  var h=+$('hold').value, r0=+$('rest').value, n=+$('rounds').value, out=[];
+  for(var i=0;i<n;i++){var raw=r0-STEP*i; out.push({rest:Math.max(MIN_REST,raw),hold:h,clamped:raw<MIN_REST});}
+  return out;
+}
+function renderSched(){
+  var p=plan(), html='', c=false;
+  p.forEach(function(r,i){ if(r.clamped)c=true;
+    html+='<tr><td class="num">'+(i+1)+'</td><td class="num'+(r.clamped?' c':'')+'">'+fmt(r.rest)+'</td><td class="num">'+fmt(r.hold)+'</td></tr>';});
+  $('sched').innerHTML=html;
+  $('note').textContent=c?'Rest can’t drop below 0:15 (10 s warning + 5 s countdown), so the shortest rounds are held at 0:15.':'';
+}
+['hold','rest','rounds'].forEach(function(id){$(id).addEventListener('change',renderSched)});
+renderSched();
+
+/* ---------- audio ---------- */
+var ac=null, master=null;
+function initAudio(){
+  if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();
+    var comp=ac.createDynamicsCompressor(); master=ac.createGain(); master.gain.value=1; master.connect(comp); comp.connect(ac.destination);}
+  if(ac.state==='suspended')ac.resume();
+}
+function tone(f,dur,type,vol,f2,delay){
+  if(!ac)return; var t=ac.currentTime+(delay||0), o=ac.createOscillator(), g=ac.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(f,t); if(f2)o.frequency.linearRampToValueAtTime(f2,t+dur);
+  g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(vol,t+0.015); g.gain.setValueAtTime(vol,t+Math.max(0.02,dur-0.04)); g.gain.linearRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.02);
+}
+var SND={
+  inhale:function(){tone(330,.45,'sine',.22,520)},          // soft rising glide
+  exhale:function(){tone(520,.45,'sine',.22,330)},          // soft falling glide
+  warn:function(){tone(660,.22,'triangle',.7);tone(880,.22,'triangle',.7,0,.24);tone(1320,.5,'triangle',.7,0,.48)},
+  beep:function(left){ left===1?tone(1175,.28,'square',.35):tone(880,.14,'square',.3) },
+  holdEnd:function(){for(var i=0;i<3;i++){tone(1600,.16,'square',.9,0,i*.24);tone(800,.16,'sawtooth',.6,0,i*.24)}}
+};
+
+/* ---------- session engine ---------- */
+var segs=[], si=0, segStart=0, fired=0, paused=false, pausedAt=0, timer=null, cfg=null, sessionStart=0, wake=null;
+
+function build(){
+  segs=[]; var p=plan();
+  p.forEach(function(r,i){
+    var d=r.rest*1000, ev=[], dir0=(i===0)?'inhale':'exhale';
+    for(var k=0;k*PACE<d-10000;k++){ ev.push({t:k*PACE,k:'pace',dir:((k%2===0)?dir0:(dir0==='inhale'?'exhale':'inhale'))}); }
+    ev.push({t:d-10000,k:'warn'});
+    for(var s=5;s>=1;s--) ev.push({t:d-s*1000,k:'beep',left:s});
+    segs.push({type:'rest',dur:d,round:i,ev:ev});
+    segs.push({type:'hold',dur:r.hold*1000,round:i,ev:[]});
+  });
+}
+function setPhase(p,label){ $('run').dataset.p=p; $('phase').textContent=label; }
+function fire(seg,e){
+  if(e.k==='pace'){ SND[e.dir](); setPhase('rest',e.dir.toUpperCase());
+    var o=$('orb'); o.style.transitionDuration=(PACE/1000)+'s'; o.style.transform=e.dir==='inhale'?'scale(1)':'scale(.45)'; }
+  else if(e.k==='warn'){ SND.warn(); setPhase('final','FINAL BREATH');
+    var o2=$('orb'); o2.style.transitionDuration='5s'; o2.style.transform='scale(1)'; }
+  else if(e.k==='beep'){ SND.beep(e.left); }
+}
+function enterSeg(){
+  var s=segs[si]; fired=0; var n=segs.length/2;
+  $('rnd').textContent='Round '+(s.round+1)+' / '+n;
+  if(s.type==='rest'){ setPhase('rest',s.round===0?'INHALE':'EXHALE'); $('orb').style.transitionDuration='0.01s'; $('orb').style.transform='scale(.45)';
+    $('next').textContent='Next: hold '+fmt(s.dur?cfg.hold:0);
+  } else { setPhase('hold','HOLD'); var nr=segs[si+1]; $('next').textContent=nr?'Next: rest '+fmt(nr.dur/1000):'Last hold — then done'; }
+}
+function finish(){
+  clearInterval(timer); setPhase('done','DONE'); $('time').textContent='✓'; $('next').textContent='Session complete. Breathe normally.';
+  $('pause').style.display='none'; $('stop').textContent='Back to setup'; releaseWake();
+}
+function tick(){
+  if(paused)return;
+  var now=performance.now();
+  while(true){
+    var s=segs[si], el=now-segStart;
+    while(fired<s.ev.length && s.ev[fired].t<=el){ fire(s,s.ev[fired]); fired++; }
+    if(el>=s.dur){
+      if(s.type==='hold') SND.holdEnd();
+      segStart+=s.dur; si++;
+      if(si>=segs.length){ finish(); return; }
+      enterSeg(); continue;
+    }
+    $('time').textContent=fmt(Math.ceil((s.dur-el)/1000));
+    var total=0; for(var i=0;i<segs.length;i++)total+=segs[i].dur;
+    var done=0; for(var j=0;j<si;j++)done+=segs[j].dur;
+    $('tot').textContent='Left '+fmt(Math.ceil((total-done-el)/1000));
+    break;
+  }
+}
+function start(){
+  initAudio(); cfg={hold:+$('hold').value};
+  build(); si=0; paused=false;
+  $('setup').classList.remove('on'); $('run').classList.add('on');
+  $('pause').style.display=''; $('pause').textContent='Pause'; $('stop').textContent='End';
+  $('time').textContent=fmt(segs[0].dur/1000);
+  enterSeg(); segStart=performance.now(); clearInterval(timer); timer=setInterval(tick,20); tick(); getWake();
+}
+function stop(){ clearInterval(timer); releaseWake(); $('run').classList.remove('on'); $('setup').classList.add('on'); }
+function getWake(){ try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(function(w){wake=w}).catch(function(){}); }catch(e){} }
+function releaseWake(){ try{ if(wake){wake.release();wake=null;} }catch(e){} }
+$('start').addEventListener('click',start);
+$('stop').addEventListener('click',stop);
+$('pause').addEventListener('click',function(){
+  if(!paused){ paused=true; pausedAt=performance.now(); $('pause').textContent='Resume'; if(ac)ac.suspend(); }
+  else { segStart+=performance.now()-pausedAt; paused=false; $('pause').textContent='Pause'; if(ac)ac.resume(); }
+});
+document.addEventListener('visibilitychange',function(){ if(!document.hidden&&timer&&!wake&&$('run').classList.contains('on'))getWake(); });
+})();
+</script>
+</body>
+</html>
